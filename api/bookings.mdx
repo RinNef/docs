@@ -1,0 +1,50 @@
+---
+title: "New file"
+description: "Description of your new file."
+---
+
+---
+
+title: "Bookings API"
+
+openapi: "/openapi/homestay.yaml"
+
+---
+
+# Bookings API
+
+API tạo và quản lý đặt phòng.
+
+## Business Logic
+
+- Trước khi tạo booking, BE phải:
+
+  1. Kiểm tra phòng trống `availability`)
+
+  2. Kiểm tra giá theo ngày
+
+  3. Sinh booking code: `BK_{YYYYMMDD}_{RANDOM}`
+
+- Trạng thái booking:
+
+  - `pending_payment`
+
+  - `paid`
+
+  - `cancelled`
+
+  - `completed`
+
+- FE sẽ redirect người dùng sang gateway (MoMo / VNPay) nếu booking ở trạng thái `pending_payment`.
+
+## Endpoints
+
+- `POST /bookings`
+
+- `GET /bookings/{id}`
+
+- `GET /bookings/user/{userId}`
+
+- `PATCH /bookings/{id}/cancel`
+
+Mintlify sẽ tự render từng endpoint dựa vào OpenAPI.

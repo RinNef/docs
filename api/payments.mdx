@@ -1,0 +1,60 @@
+---
+title: "New file"
+description: "Description of your new file."
+---
+
+---
+
+title: "Payments API"
+
+openapi: "/openapi/homestay.yaml"
+
+---
+
+# Payments API
+
+Các API xử lý thanh toán nội bộ và callback từ MoMo/VNPay.
+
+## Business Logic
+
+### Quy trình thanh toán
+
+1. FE request `POST /payments/create`
+
+2. BE tạo booking ở trạng thái `pending_payment`
+
+3. BE tạo payment URL → trả về cho FE
+
+4. FE redirect người dùng đến MoMo/VNPay
+
+5. Payment gateway gọi webhook `/payments/momo/callback` hoặc `/payments/vnpay/callback`
+
+6. BE:
+
+   - Xác thực chữ ký
+
+   - Cập nhật booking → `paid`
+
+   - Ghi log giao dịch
+
+   - Trả JSON thành công
+
+### Ràng buộc an toàn
+
+- Không tin tưởng dữ liệu từ FE → validate lại on server
+
+- Webhook cần xác thực signature
+
+- Hạn chế spam callback bằng Redis lock hoặc idempotency key
+
+## Endpoints
+
+- `POST /payments/create`
+
+- `POST /payments/momo/callback`
+
+- `POST /payments/vnpay/callback`
+
+- `GET /payments/{bookingId}`
+
+Thân API sẽ được sinh tự động từ OpenAPI.

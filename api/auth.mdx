@@ -1,0 +1,38 @@
+---
+title: "New file"
+description: "Description of your new file."
+---
+
+---
+
+title: "Authentication"
+
+openapi: "/openapi/homestay.yaml"
+
+---
+
+# Authentication API
+
+API xử lý các chức năng đăng nhập, đăng ký, refresh token, logout.
+
+## Business Logic
+
+- Người dùng đăng nhập bằng email + mật khẩu  
+
+- Token được trả về dạng JWT  
+
+- Refresh token dùng để gia hạn phiên mà không cần đăng nhập lại  
+
+- Block login 5 phút nếu sai mật khẩu quá 5 lần  
+
+## Endpoints
+
+Chọn endpoint phía dưới (tự sinh từ OpenAPI):
+
+- `POST /auth/register`
+
+- `POST /auth/login`
+
+- `POST /auth/refresh`
+
+- `POST /auth/logout`

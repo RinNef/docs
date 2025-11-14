@@ -1,0 +1,909 @@
+openapi: 3.0.3
+info:
+  title: Homestay Platform API
+  version: 1.0.0
+  description: |
+    API cho nền tảng đặt homestay: auth, user, listings, bookings, payments, search.
+
+servers:
+  - url: https://api.homestay.example.com
+    description: Production
+  - url: https://staging-api.homestay.example.com
+    description: Staging
+
+tags:
+  - name: Auth
+    description: Đăng ký, đăng nhập, token
+  - name: Users
+    description: Người dùng hệ thống
+  - name: Listings
+    description: Quản lý homestay
+  - name: Bookings
+    description: Đặt phòng
+  - name: Payments
+    description: Thanh toán & webhook
+  - name: Search
+    description: Tìm kiếm & lọc
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      tags: [Misc]
+      responses:
+        '200':
+          description: Service healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  /auth/register:
+    post:
+      summary: Đăng ký tài khoản
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Tạo user thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Dữ liệu không hợp lệ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/login:
+    post:
+      summary: Đăng nhập
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Đăng nhập thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Sai tài khoản hoặc mật khẩu
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/refresh:
+    post:
+      summary: Refresh access token
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refreshToken:
+                  type: string
+      responses:
+        '200':
+          description: Refresh thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenPair'
+        '401':
+          description: Refresh token không hợp lệ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/logout:
+    post:
+      summary: Đăng xuất (revoke refresh token)
+      tags: [Auth]
+      security:
+        - bearerAuth: [ ]
+      responses:
+        '204':
+          description: Logout thành công
+
+  /users/me:
+    get:
+      summary: Lấy thông tin tài khoản hiện tại
+      tags: [Users]
+      security:
+        - bearerAuth: [ ]
+      responses:
+        '200':
+          description: Thông tin user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: Chưa đăng nhập
+
+    patch:
+      summary: Cập nhật profile user hiện tại
+      tags: [Users]
+      security:
+        - bearerAuth: [ ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProfileRequest'
+      responses:
+        '200':
+          description: Cập nhật thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+  /users/{id}:
+    get:
+      summary: Lấy thông tin public của user
+      tags: [Users]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Thông tin user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicUser'
+        '404':
+          description: Không tìm thấy user
+
+  /listings:
+    get:
+      summary: Danh sách listing (dạng thô, dùng cho admin/host)
+      tags: [Listings]
+      security:
+        - bearerAuth: [ ]
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [draft, published, blocked]
+        - in: query
+          name: ownerId
+          schema:
+            type: string
+        - in: query
+          name: page
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - in: query
+          name: pageSize
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Danh sách listing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedListings'
+
+    post:
+      summary: Tạo listing mới (host)
+      tags: [Listings]
+      security:
+        - bearerAuth: [ ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateListingRequest'
+      responses:
+        '201':
+          description: Tạo listing thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Listing'
+
+  /listings/{id}:
+    get:
+      summary: Xem chi tiết listing
+      tags: [Listings]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Chi tiết listing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Listing'
+        '404':
+          description: Không tìm thấy listing
+
+    patch:
+      summary: Cập nhật listing (chủ nhà hoặc admin)
+      tags: [Listings]
+      security:
+        - bearerAuth: [ ]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateListingRequest'
+      responses:
+        '200':
+          description: Cập nhật thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Listing'
+
+    delete:
+      summary: Xoá listing
+      tags: [Listings]
+      security:
+        - bearerAuth: [ ]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Xoá thành công
+        '409':
+          description: Không xoá được do còn booking tương lai
+
+  /listings/{id}/availability:
+    get:
+      summary: Kiểm tra lịch phòng trống
+      tags: [Listings]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: from
+          required: true
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: to
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Lịch phòng
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AvailabilityResponse'
+
+  /search/listings:
+    get:
+      summary: Tìm kiếm listing public
+      tags: [Search]
+      parameters:
+        - in: query
+          name: location
+          schema:
+            type: string
+        - in: query
+          name: checkIn
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: checkOut
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: guests
+          schema:
+            type: integer
+        - in: query
+          name: minPrice
+          schema:
+            type: number
+        - in: query
+          name: maxPrice
+          schema:
+            type: number
+        - in: query
+          name: amenities
+          schema:
+            type: array
+            items:
+              type: string
+          style: form
+          explode: true
+        - in: query
+          name: sort
+          schema:
+            type: string
+            enum: [price_asc, price_desc, rating_desc, newest]
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: pageSize
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Kết quả tìm kiếm
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedListings'
+
+  /bookings:
+    get:
+      summary: Danh sách booking của user hiện tại
+      tags: [Bookings]
+      security:
+        - bearerAuth: [ ]
+      parameters:
+        - in: query
+          name: status
+          schema:
+            $ref: '#/components/schemas/BookingStatus'
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: pageSize
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Danh sách booking
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedBookings'
+
+    post:
+      summary: Tạo booking mới
+      tags: [Bookings]
+      security:
+        - bearerAuth: [ ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBookingRequest'
+      responses:
+        '201':
+          description: Tạo booking thành công (chờ thanh toán)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+        '400':
+          description: Lỗi dữ liệu hoặc lịch không còn trống
+
+  /bookings/{id}:
+    get:
+      summary: Lấy chi tiết booking
+      tags: [Bookings]
+      security:
+        - bearerAuth: [ ]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Chi tiết booking
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+        '404':
+          description: Không tìm thấy booking
+
+  /bookings/{id}/cancel:
+    patch:
+      summary: Huỷ booking
+      tags: [Bookings]
+      security:
+        - bearerAuth: [ ]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Huỷ thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+        '409':
+          description: Không thể huỷ (quá hạn hoặc đã hoàn tất)
+
+  /payments/create:
+    post:
+      summary: Tạo giao dịch thanh toán cho booking
+      tags: [Payments]
+      security:
+        - bearerAuth: [ ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePaymentRequest'
+      responses:
+        '201':
+          description: Tạo payment thành công, trả URL thanh toán
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentInitResponse'
+        '400':
+          description: Booking không hợp lệ
+
+  /payments/{bookingId}:
+    get:
+      summary: Lấy thông tin payment theo booking
+      tags: [Payments]
+      security:
+        - bearerAuth: [ ]
+      parameters:
+        - in: path
+          name: bookingId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Thông tin payment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+        '404':
+          description: Không có payment cho booking này
+
+  /payments/momo/callback:
+    post:
+      summary: Webhook callback từ MoMo
+      tags: [Payments]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Payload callback từ MoMo (raw)
+      responses:
+        '200':
+          description: Xử lý thành công
+
+  /payments/vnpay/callback:
+    get:
+      summary: Webhook callback từ VNPay
+      tags: [Payments]
+      parameters:
+        - in: query
+          name: vnp_TxnRef
+          schema:
+            type: string
+        - in: query
+          name: vnp_Amount
+          schema:
+            type: string
+        - in: query
+          name: vnp_ResponseCode
+          schema:
+            type: string
+        - in: query
+          name: vnp_SecureHash
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Xử lý thành công
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Something went wrong
+        code:
+          type: string
+          example: VALIDATION_ERROR
+
+    TokenPair:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+
+    RegisterRequest:
+      type: object
+      required: [email, password, fullName]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 6
+        fullName:
+          type: string
+        phone:
+          type: string
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+
+    AuthResponse:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+        tokens:
+          $ref: '#/components/schemas/TokenPair'
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          example: usr_123
+        email:
+          type: string
+          format: email
+        fullName:
+          type: string
+        phone:
+          type: string
+        role:
+          type: string
+          enum: [guest, host, admin]
+        createdAt:
+          type: string
+          format: date-time
+
+    PublicUser:
+      type: object
+      properties:
+        id:
+          type: string
+        fullName:
+          type: string
+
+    UpdateProfileRequest:
+      type: object
+      properties:
+        fullName:
+          type: string
+        phone:
+          type: string
+
+    Listing:
+      type: object
+      properties:
+        id:
+          type: string
+          example: lst_123
+        title:
+          type: string
+        description:
+          type: string
+        ownerId:
+          type: string
+        location:
+          $ref: '#/components/schemas/Location'
+        pricePerNight:
+          type: number
+          format: float
+        maxGuests:
+          type: integer
+        amenities:
+          type: array
+          items:
+            type: string
+        photos:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          enum: [draft, published, blocked]
+        rating:
+          type: number
+          format: float
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    Location:
+      type: object
+      properties:
+        country:
+          type: string
+        city:
+          type: string
+        addressLine:
+          type: string
+        lat:
+          type: number
+          format: float
+        lng:
+          type: number
+          format: float
+
+    CreateListingRequest:
+      type: object
+      required: [title, description, pricePerNight, maxGuests, location]
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        pricePerNight:
+          type: number
+        maxGuests:
+          type: integer
+        location:
+          $ref: '#/components/schemas/Location'
+        amenities:
+          type: array
+          items:
+            type: string
+        photos:
+          type: array
+          items:
+            type: string
+
+    UpdateListingRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        pricePerNight:
+          type: number
+        maxGuests:
+          type: integer
+        amenities:
+          type: array
+          items:
+            type: string
+        photos:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          enum: [draft, published, blocked]
+
+    AvailabilityResponse:
+      type: object
+      properties:
+        listingId:
+          type: string
+        days:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+                format: date
+              available:
+                type: boolean
+
+    BookingStatus:
+      type: string
+      enum:
+        - pending_payment
+        - paid
+        - cancelled
+        - completed
+
+    Booking:
+      type: object
+      properties:
+        id:
+          type: string
+          example: bk_20250101_001
+        userId:
+          type: string
+        listingId:
+          type: string
+        checkIn:
+          type: string
+          format: date
+        checkOut:
+          type: string
+          format: date
+        guests:
+          type: integer
+        totalAmount:
+          type: number
+        status:
+          $ref: '#/components/schemas/BookingStatus'
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateBookingRequest:
+      type: object
+      required: [listingId, checkIn, checkOut, guests]
+      properties:
+        listingId:
+          type: string
+        checkIn:
+          type: string
+          format: date
+        checkOut:
+          type: string
+          format: date
+        guests:
+          type: integer
+
+    PaymentStatus:
+      type: string
+      enum:
+        - pending
+        - success
+        - failed
+
+    Payment:
+      type: object
+      properties:
+        id:
+          type: string
+          example: pay_123
+        bookingId:
+          type: string
+        provider:
+          type: string
+          enum: [momo, vnpay]
+        amount:
+          type: number
+        currency:
+          type: string
+          example: VND
+        status:
+          $ref: '#/components/schemas/PaymentStatus'
+        rawResponse:
+          type: object
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+
+    CreatePaymentRequest:
+      type: object
+      required: [bookingId, provider]
+      properties:
+        bookingId:
+          type: string
+        provider:
+          type: string
+          enum: [momo, vnpay]
+
+    PaymentInitResponse:
+      type: object
+      properties:
+        paymentId:
+          type: string
+        checkoutUrl:
+          type: string
+
+    PaginatedListings:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Listing'
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+
+    PaginatedBookings:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Booking'
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer

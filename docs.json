@@ -12,11 +12,12 @@
   "navigation": {
     "groups": [
       {
-        "group": "Getting Started",
+        "group": "API Reference",
+        "openapi": "/openapi/homestay.yaml",
         "pages": [
-          "getting-started/introduction",
-          "getting-started/system-overview",
-          "getting-started/glossary"
+          "api/overview",
+          "GET /listings",
+          "POST /bookings"
         ]
       },
       {
